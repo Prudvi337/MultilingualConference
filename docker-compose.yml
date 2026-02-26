@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.5.3
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"   # WebRTC/HTTP
+      - "7881:7881"   # HTTP API
+      - "7882:7882/udp" # WebRTC UDP
+    environment:
+      LIVEKIT_KEYS: "devkey: secret"
+    restart: unless-stopped
+
+# LiveKit Dashboard will be available at http://localhost:7880
+# Use these credentials in your backend:
+#   LIVEKIT_URL=ws://localhost:7880
+#   LIVEKIT_API_KEY=devkey
+#   LIVEKIT_API_SECRET=secret
+
