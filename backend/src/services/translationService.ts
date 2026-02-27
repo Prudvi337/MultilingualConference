@@ -24,8 +24,8 @@ const sessions = new Map<WebSocket, TranslationSession>();
 const roomParticipants = new Map<string, Set<WebSocket>>();
 
 // Audio chunk settings
-const CHUNK_DURATION_MS = 2000; // Process every 2 seconds of audio
-const MIN_AUDIO_SIZE = 32000; // Minimum bytes before processing (~1 second at 16kHz mono 16-bit)
+const CHUNK_DURATION_MS = 3000; // Process every 3 seconds of audio to keep RPM low
+const MIN_AUDIO_SIZE = 96000; // ~3 seconds at 16kHz mono 16-bit (16000 * 2 bytes * 3s)
 const DEFAULT_SAMPLE_RATE = 16000;
 const DEFAULT_CHANNELS = 1;
 
@@ -263,29 +263,41 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
     // Convert Buffer to Int16Array for the AI pipeline
     // IMPORTANT: Create a proper copy to avoid buffer alignment issues
     const int16Length = Math.floor(combinedAudio.length / 2);
-    const samples = new Int16Array(int16Length);
 
+    if (int16Length === 0) {
+      console.warn(`[TranslationService] Received empty audio buffer from ${session.participantId}, skipping`);
+      session.isProcessing = false;
+      return;
+    }
+
+    const samples = new Int16Array(int16Length);
     let minSample = 0, maxSample = 0, sumAbsSample = 0;
+
     for (let i = 0; i < int16Length; i++) {
       // Read as little-endian Int16
-      samples[i] = combinedAudio.readInt16LE(i * 2);
-      minSample = Math.min(minSample, samples[i]);
-      maxSample = Math.max(maxSample, samples[i]);
-      sumAbsSample += Math.abs(samples[i]);
+      try {
+        samples[i] = combinedAudio.readInt16LE(i * 2);
+        minSample = Math.min(minSample, samples[i]);
+        maxSample = Math.max(maxSample, samples[i]);
+        sumAbsSample += Math.abs(samples[i]);
+      } catch (e) {
+        console.error(`[TranslationService] Error reading audio at index ${i}:`, e);
+        break;
+      }
     }
 
     const avgLevel = sumAbsSample / int16Length;
     const durationMs = (int16Length / session.sampleRate) * 1000;
 
     console.log(
-      `[TranslationService] Audio stats:\n` +
+      `[TranslationService] Audio stats for ${session.participantId}:\n` +
       `  Samples: ${int16Length}, Duration: ${durationMs.toFixed(0)}ms\n` +
       `  Range: [${minSample}, ${maxSample}], Avg level: ${avgLevel.toFixed(0)}`
     );
 
-    // Skip if audio is too quiet (likely silence)
-    if (avgLevel < 100) {
-      console.log(`[TranslationService] Audio too quiet (avg: ${avgLevel.toFixed(0)}), skipping`);
+    // Skip if audio is too quiet (likely silence) or NaN
+    if (isNaN(avgLevel) || avgLevel < 100) {
+      console.log(`[TranslationService] Audio for ${session.participantId} too quiet (avg: ${avgLevel || 0}), skipping`);
       sendMessage(session.ws, { type: 'no_speech', message: 'Audio too quiet' });
       session.isProcessing = false;
       return;

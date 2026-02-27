@@ -448,7 +448,11 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
                 ws.onopen = () => {
                   console.log('[Translation] WebSocket connected');
                   setIsTranslating(true);
-                  const roomForTranslation = tokenResponse.uniqueRoomId || currentConfig.roomName;
+                  // CRITICAL: Always use uniqueRoomId for the translation service bucket
+                  // to ensure all participants in the same PeerJS room can hear each other.
+                  const roomForTranslation = tokenResponse.uniqueRoomId;
+                  console.log(`[Translation] Connecting to room bucket: ${roomForTranslation}`);
+
                   ws.send(JSON.stringify({
                     type: 'start',
                     roomName: roomForTranslation,
