@@ -1,15 +1,6 @@
 {
   "version": 2,
   "name": "multilingual-conferencing-frontend",
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/assets/(.*)",
@@ -21,13 +12,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_BACKEND_URL": "@backend_url"
-  },
-  "build": {
-    "env": {
-      "VITE_BACKEND_URL": "@backend_url"
-    }
-  }
+  ]
 }
