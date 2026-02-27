@@ -11,12 +11,8 @@ import {
 import { pcmToWav, getAudioFormat } from './audioProcessor';
 
 // Initialize OpenAI client
-// NOTE: dangerouslyAllowBrowser is set to true because our Node.js polyfills
-// for livekit-client make Node.js look like a browser to other libraries.
-// This is actually running on the SERVER - the API key is NOT exposed to browsers.
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
-  dangerouslyAllowBrowser: true, // Safe: We're on Node.js, polyfills trigger false positive
 });
 
 /**
@@ -188,7 +184,7 @@ ${text}`;
     };
   } catch (error: any) {
     console.error('[Translation] ✗ Translation error:', error.message);
-    
+
     // Fallback: return original text if translation fails
     console.warn('[Translation] Falling back to original text');
     return {
