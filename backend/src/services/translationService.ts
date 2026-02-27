@@ -33,9 +33,9 @@ const DEFAULT_CHANNELS = 1;
  * Initialize WebSocket server for translation
  */
 export function initTranslationWebSocket(server: Server): WebSocketServer {
-  const wss = new WebSocketServer({ 
-    server, 
-    path: '/ws/translate' 
+  const wss = new WebSocketServer({
+    server,
+    path: '/ws/translate'
   });
 
   console.log('[TranslationService] WebSocket server initialized at /ws/translate');
@@ -97,13 +97,13 @@ function handleControlMessage(ws: WebSocket, message: any): void {
         channels: message.channels || DEFAULT_CHANNELS,
       };
       sessions.set(ws, session);
-      
+
       // Add to room participants index
       if (!roomParticipants.has(session.roomName)) {
         roomParticipants.set(session.roomName, new Set());
       }
       roomParticipants.get(session.roomName)!.add(ws);
-      
+
       const roomSize = roomParticipants.get(session.roomName)!.size;
       console.log(
         `[TranslationService] Started session for ${session.participantId}\n` +
@@ -111,9 +111,9 @@ function handleControlMessage(ws: WebSocket, message: any): void {
         `  Wants to HEAR: ${session.targetLanguage}\n` +
         `  Sample rate: ${session.sampleRate}Hz`
       );
-      
-      sendMessage(ws, { 
-        type: 'started', 
+
+      sendMessage(ws, {
+        type: 'started',
         participantId: session.participantId,
         targetLanguage: session.targetLanguage,
         roomParticipants: roomSize,
@@ -136,8 +136,12 @@ function handleControlMessage(ws: WebSocket, message: any): void {
         if (message.sampleRate) {
           sessionToUpdate.sampleRate = message.sampleRate;
         }
-        console.log(`[TranslationService] Updated config for ${sessionToUpdate.participantId}`);
-        sendMessage(ws, { type: 'configured', targetLanguage: sessionToUpdate.targetLanguage });
+        console.log(`[TranslationService] Updated config for ${sessionToUpdate.participantId} to ${sessionToUpdate.targetLanguage}`);
+        sendMessage(ws, {
+          type: 'started',
+          targetLanguage: sessionToUpdate.targetLanguage,
+          message: 'Voice configuration updated'
+        });
       }
       break;
 
@@ -153,7 +157,7 @@ function removeSessionFromRoom(ws: WebSocket): void {
   const session = sessions.get(ws);
   if (session) {
     console.log(`[TranslationService] Removing ${session.participantId} from room ${session.roomName}`);
-    
+
     // Remove from room participants
     const roomSet = roomParticipants.get(session.roomName);
     if (roomSet) {
@@ -162,7 +166,7 @@ function removeSessionFromRoom(ws: WebSocket): void {
         roomParticipants.delete(session.roomName);
       }
     }
-    
+
     sessions.delete(ws);
   }
 }
@@ -173,7 +177,7 @@ function removeSessionFromRoom(ws: WebSocket): void {
 function getOtherParticipantsInRoom(speakerWs: WebSocket, roomName: string): TranslationSession[] {
   const roomSet = roomParticipants.get(roomName);
   if (!roomSet) return [];
-  
+
   const others: TranslationSession[] = [];
   roomSet.forEach(ws => {
     if (ws !== speakerWs) {
@@ -183,7 +187,7 @@ function getOtherParticipantsInRoom(speakerWs: WebSocket, roomName: string): Tra
       }
     }
   });
-  
+
   return others;
 }
 
@@ -199,7 +203,7 @@ function handleAudioData(ws: WebSocket, audioData: Buffer): void {
 
   // Add to buffer
   session.audioBuffer.push(audioData);
-  
+
   // Calculate total buffer size
   const totalSize = session.audioBuffer.reduce((sum, buf) => sum + buf.length, 0);
   const timeSinceLastProcess = Date.now() - session.lastProcessTime;
@@ -211,8 +215,8 @@ function handleAudioData(ws: WebSocket, audioData: Buffer): void {
 
   // Process if we have enough audio and enough time has passed
   if (
-    !session.isProcessing && 
-    totalSize >= MIN_AUDIO_SIZE && 
+    !session.isProcessing &&
+    totalSize >= MIN_AUDIO_SIZE &&
     timeSinceLastProcess >= CHUNK_DURATION_MS
   ) {
     processAudioBuffer(session);
@@ -238,16 +242,16 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
 
   // Get other participants in the room
   const otherParticipants = getOtherParticipantsInRoom(session.ws, session.roomName);
-  
+
   console.log(
     `[TranslationService] Processing ${combinedAudio.length} bytes from ${session.participantId}\n` +
     `  Other participants in room: ${otherParticipants.map(p => `${p.participantId}(${p.targetLanguage})`).join(', ') || 'none'}`
   );
 
   // Notify speaker that their audio is being processed
-  sendMessage(session.ws, { 
-    type: 'processing', 
-    audioSize: combinedAudio.length 
+  sendMessage(session.ws, {
+    type: 'processing',
+    audioSize: combinedAudio.length
   });
 
   // If no other participants, still transcribe for the speaker's reference
@@ -260,7 +264,7 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
     // IMPORTANT: Create a proper copy to avoid buffer alignment issues
     const int16Length = Math.floor(combinedAudio.length / 2);
     const samples = new Int16Array(int16Length);
-    
+
     let minSample = 0, maxSample = 0, sumAbsSample = 0;
     for (let i = 0; i < int16Length; i++) {
       // Read as little-endian Int16
@@ -269,16 +273,16 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
       maxSample = Math.max(maxSample, samples[i]);
       sumAbsSample += Math.abs(samples[i]);
     }
-    
+
     const avgLevel = sumAbsSample / int16Length;
     const durationMs = (int16Length / session.sampleRate) * 1000;
-    
+
     console.log(
       `[TranslationService] Audio stats:\n` +
       `  Samples: ${int16Length}, Duration: ${durationMs.toFixed(0)}ms\n` +
       `  Range: [${minSample}, ${maxSample}], Avg level: ${avgLevel.toFixed(0)}`
     );
-    
+
     // Skip if audio is too quiet (likely silence)
     if (avgLevel < 100) {
       console.log(`[TranslationService] Audio too quiet (avg: ${avgLevel.toFixed(0)}), skipping`);
@@ -351,7 +355,7 @@ async function sendTranslationToRecipient(
   recipient: TranslationSession
 ): Promise<void> {
   const targetLanguage = recipient.targetLanguage;
-  
+
   console.log(
     `[TranslationService] Translating for ${recipient.participantId}: ` +
     `${sourceLanguage} → ${targetLanguage}`

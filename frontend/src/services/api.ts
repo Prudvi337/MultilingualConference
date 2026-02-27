@@ -8,7 +8,8 @@ import axios from 'axios';
 import { TokenResponse, RoomConfig } from '../types';
 
 // Get backend URL from environment variable
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const BACKEND_URL = rawBackendUrl.replace(/\/+$/, '');
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -32,7 +33,7 @@ export async function getAccessToken(config: RoomConfig): Promise<TokenResponse>
   } catch (error: any) {
     console.error('[API] Error getting access token:', error);
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Failed to get access token. Is the backend running?'
     );
   }
@@ -45,14 +46,14 @@ export async function getAccessToken(config: RoomConfig): Promise<TokenResponse>
  * @param roomId - The unique room ID
  * @returns List of participants in the room
  */
-export async function getRoomParticipants(roomId: string): Promise<Array<{id: string; name: string; createdAt: string}>> {
+export async function getRoomParticipants(roomId: string): Promise<Array<{ id: string; name: string; createdAt: string }>> {
   try {
-    const response = await api.get<{participants: Array<{id: string; name: string; createdAt: string}>}>(`/api/room/${roomId}/participants`);
+    const response = await api.get<{ participants: Array<{ id: string; name: string; createdAt: string }> }>(`/api/room/${roomId}/participants`);
     return response.data.participants;
   } catch (error: any) {
     console.error('[API] Error getting room participants:', error);
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Failed to get room participants'
     );
   }

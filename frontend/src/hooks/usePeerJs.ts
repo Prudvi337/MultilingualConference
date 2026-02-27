@@ -21,7 +21,6 @@ export interface UsePeerJsResult {
   isTalking: boolean;  // Push-to-Talk state
   isVideoEnabled: boolean;  // Video toggle state
   lastTranscription: string | null;   // What YOU said
-  lastTranslation: string | null;     // Translation of what YOU said
   incomingMessage: IncomingMessage | null;  // Message from OTHER participant
   localStream: MediaStream | null;  // Local audio/video stream
   remotePeers: RemotePeerInfo[];  // Remote peers
@@ -103,7 +102,6 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
   const [isTranslating, setIsTranslating] = useState(false);
   const [isTalking, setIsTalking] = useState(false);  // Push-to-Talk state
   const [lastTranscription, setLastTranscription] = useState<string | null>(null);
-  const [lastTranslation] = useState<string | null>(null);
   const [incomingMessage, setIncomingMessage] = useState<IncomingMessage | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeerInfo[]>([]);
@@ -126,6 +124,7 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
   const remoteMediaConnectionsRef = useRef<Map<string, MediaConnection>>(new Map());
   const knownPeersRef = useRef<Set<string>>(new Set());  // Track peers we've already called
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);  // Polling interval for new participants
+  const audioCaptureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const participantNamesRef = useRef<Map<string, string>>(new Map());  // Map peer IDs to display names
   const callInProgressRef = useRef<Set<string>>(new Set());  // Track calls currently in progress to avoid duplicates
   const localStreamRef = useRef<MediaStream | null>(null);  // Ref for cleanup access
@@ -507,11 +506,33 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
             async function playTranslatedAudioInline(audioData: ArrayBuffer) {
               try {
                 if (!playbackContextRef.current || playbackContextRef.current.state === 'closed') {
+                  console.log('[Audio] Initializing new playback context');
                   playbackContextRef.current = new AudioContext();
                 }
                 const ac = playbackContextRef.current;
-                if (ac.state === 'suspended') await ac.resume();
+
+                // Add interaction listener to resume if suspended (standard browser policy fix)
+                if (ac.state === 'suspended') {
+                  console.log('[Audio] Playback context suspended, waiting for interaction or resuming...');
+                  const resume = async () => {
+                    if (ac.state === 'suspended') {
+                      await ac.resume();
+                      console.log('[Audio] Playback context resumed via interaction');
+                    }
+                    window.removeEventListener('click', resume);
+                    window.removeEventListener('keydown', resume);
+                  };
+                  window.addEventListener('click', resume);
+                  window.addEventListener('keydown', resume);
+
+                  // Try to resume immediately just in case
+                  await ac.resume().catch(() => { });
+                }
+
+                console.log(`[Audio] Received binary data: ${audioData.byteLength} bytes. Decoding...`);
                 const buf = await ac.decodeAudioData(audioData.slice(0));
+                console.log(`[Audio] Decoded successfully: ${buf.duration.toFixed(2)}s. Playing...`);
+
                 const source = ac.createBufferSource();
                 source.buffer = buf;
                 source.connect(ac.destination);
@@ -522,7 +543,8 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
             }
 
             // Start audio capture after a short delay
-            setTimeout(() => {
+            if (audioCaptureTimeoutRef.current) clearTimeout(audioCaptureTimeoutRef.current);
+            audioCaptureTimeoutRef.current = setTimeout(() => {
               if (wsRef.current?.readyState === WebSocket.OPEN) {
                 startAudioCaptureInline();
               }
@@ -755,7 +777,6 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     isTalking,
     isVideoEnabled,
     lastTranscription,
-    lastTranslation,
     incomingMessage,
     localStream,
     remotePeers,

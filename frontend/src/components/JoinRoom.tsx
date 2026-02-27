@@ -116,8 +116,8 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                 <div className="flex items-center">
                   <span className="text-red-400 text-sm">⚠️ Server offline</span>
                 </div>
-                <p className="text-red-300/70 text-xs mt-1 font-mono">
-                  Run: cd backend && npm run dev
+                <p className="text-red-300/70 text-xs mt-1">
+                  Please ensure the server is running and accessible.
                 </p>
               </div>
             )}
@@ -132,8 +132,8 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                   type="button"
                   onClick={() => setMode('create')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'create'
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                   disabled={!isBackendHealthy}
                 >
@@ -143,8 +143,8 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                   type="button"
                   onClick={() => setMode('join')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'join'
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                   disabled={!isBackendHealthy}
                 >
@@ -242,8 +242,8 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
               type="submit"
               disabled={!isBackendHealthy}
               className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all duration-300 ${isBackendHealthy
-                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-[1.02] active:scale-[0.98]'
-                  : 'bg-slate-600 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-[1.02] active:scale-[0.98]'
+                : 'bg-slate-600 cursor-not-allowed'
                 }`}
             >
               {isBackendHealthy ? (
