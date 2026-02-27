@@ -1,18 +1,12 @@
-# Deployment Guide
-
-This project is configured for **Render** (Backend) and **Vercel** (Frontend).
-
 ## 1. Backend Deployment (Render)
 
-1. **Connect Repository**: Push this code to GitHub and connect the repository to Render.
-2. **Blueprint**: Render will automatically detect the `render.yaml` file at the root.
-3. **Environment Variables**:
-   - `OPENAI_API_KEY`: Your OpenAI key (required).
-   - `FRONTEND_URL`: Your Vercel frontend URL (e.g., `https://your-app.vercel.app`) - required for CORS.
-   - `NODE_ENV`: Set to `production`.
-4. **Build Settings**: (Already in `render.yaml`)
-   - Build Command: `npm install && npm run build`
-   - Start Command: `npm start`
+If you connect **only the `backend/` folder** to Render:
+1. **Build Command**: Set to `npm install && npm run build` in the Render dashboard.
+2. **Start Command**: Set to `npm start` in the Render dashboard.
+3. **Environment Variables**: Set `OPENAI_API_KEY`, `FRONTEND_URL`, and `NODE_ENV=production`.
+
+If you connect the **whole repository root** to Render:
+1. **Blueprint**: Render will automatically detect the `render.yaml` at the root. (Note: I have currently placed it inside `backend/` since you connected that folder directly).
 
 ## 2. Frontend Deployment (Vercel)
 
