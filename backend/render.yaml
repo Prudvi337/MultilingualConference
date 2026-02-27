@@ -1,24 +1,15 @@
 services:
   - type: web
-    name: multilingual-conferencing-backend
+    name: multilingual-conference-backend
     runtime: node
-    plan: standard
+    region: oregon
+    plan: starter
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-      - key: FRONTEND_URL
-        sync: false  # Set this to your Vercel frontend URL after deployment
-      - key: LIVEKIT_URL
-        sync: false  # Your LiveKit server URL (e.g., wss://your-livekit.livekit.cloud)
-      - key: LIVEKIT_API_KEY
-        generateValue: true
-      - key: LIVEKIT_API_SECRET
-        generateValue: true
       - key: OPENAI_API_KEY
-        sync: false  # Your OpenAI API key
-    healthCheckPath: /api/health
-    autoDeploy: true
+        sync: false  # Must be set manually in Render dashboard
+      - key: FRONTEND_URL
+        sync: false  # Set to your Vercel frontend URL (e.g., https://your-app.vercel.app)

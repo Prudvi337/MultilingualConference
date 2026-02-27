@@ -55,11 +55,16 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
       return;
     }
 
-    // For join mode, we need to validate that the room ID looks like a unique room ID
-    if (mode === 'join' && !roomName.includes('_')) {
-      alert('Please enter a valid room ID (should contain underscores, like: room-name_abc123)');
+    // For join mode, validate that user has entered something meaningful
+    if (mode === 'join' && roomName.trim().length < 3) {
+      alert('Please enter the unique room ID shared by the room creator. It should look like "room-name_abc12345".');
       return;
     }
+
+    console.log('[JoinRoom] Submitting with mode:', mode);
+    console.log('[JoinRoom] Room name:', roomName);
+    console.log('[JoinRoom] Participant name:', participantName);
+    console.log('[JoinRoom] Target language:', targetLanguage);
 
     onJoin({
       roomName: roomName.trim(),
@@ -126,11 +131,10 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                 <button
                   type="button"
                   onClick={() => setMode('create')}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                    mode === 'create'
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'create'
                       ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
-                  }`}
+                    }`}
                   disabled={!isBackendHealthy}
                 >
                   🎉 Create Room
@@ -138,20 +142,19 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                 <button
                   type="button"
                   onClick={() => setMode('join')}
-                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-                    mode === 'join'
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${mode === 'join'
                       ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
                       : 'text-gray-400 hover:text-white'
-                  }`}
+                    }`}
                   disabled={!isBackendHealthy}
                 >
                   🔗 Join Room
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {mode === 'create' 
-                  ? 'Create a new room and share the unique ID with others'
-                  : 'Join an existing room using the unique room ID'
+                {mode === 'create'
+                  ? 'Create a new room and share the unique ID (e.g., "room-name_abc123") with others'
+                  : 'Join an existing room by pasting the unique room ID (e.g., "room-name_abc123") shared with you'
                 }
               </p>
             </div>
@@ -169,7 +172,7 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
                   type="text"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  placeholder={mode === 'create' ? 'e.g., team-meeting' : 'e.g., team-meeting_abc123'}
+                  placeholder={mode === 'create' ? 'e.g., team-meeting' : 'e.g., team-meeting_1a2b3c4d'}
                   className="w-full pl-12 pr-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                   disabled={!isBackendHealthy}
                 />
@@ -183,7 +186,7 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
               {mode === 'create' && (
                 <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                   <span>💡</span>
-                  A unique ID will be generated automatically
+                  A unique room ID will be generated automatically (e.g., "team-meeting_1a2b3c4d")
                 </p>
               )}
             </div>
@@ -238,11 +241,10 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
             <button
               type="submit"
               disabled={!isBackendHealthy}
-              className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all duration-300 ${
-                isBackendHealthy
+              className={`w-full py-4 px-6 rounded-xl font-semibold text-white transition-all duration-300 ${isBackendHealthy
                   ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-[1.02] active:scale-[0.98]'
                   : 'bg-slate-600 cursor-not-allowed'
-              }`}
+                }`}
             >
               {isBackendHealthy ? (
                 <span className="flex items-center justify-center gap-2">

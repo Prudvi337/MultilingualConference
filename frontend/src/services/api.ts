@@ -59,6 +59,22 @@ export async function getRoomParticipants(roomId: string): Promise<Array<{id: st
 }
 
 /**
+ * Leave a room
+ * 
+ * @param roomId - The unique room ID
+ * @param peerId - The participant's peer ID
+ */
+export async function leaveRoom(roomId: string, peerId: string): Promise<void> {
+  try {
+    await api.post(`/api/room/${roomId}/leave`, { peerId });
+    console.log('[API] Successfully left room');
+  } catch (error: any) {
+    console.error('[API] Error leaving room:', error);
+    // Don't throw - cleanup should continue even if API call fails
+  }
+}
+
+/**
  * Start translation worker for a room
  * 
  * @param roomName - Name of the room

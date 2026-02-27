@@ -16,6 +16,7 @@ export interface TokenResponse {
   roomName: string;
   uniqueRoomId?: string; // Unique room ID for cloud sharing
   peerId?: string; // PeerJS participant ID
+  participantName?: string; // Participant's display name for tracking
   roomParticipants?: Array<{
     id: string;
     name: string;

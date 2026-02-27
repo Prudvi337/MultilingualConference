@@ -62,9 +62,13 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
 
   // Attach remote stream to video element
   useEffect(() => {
-    if (remoteVideoRef.current && remotePeers.length > 0 && remotePeers[0].audioStream) {
-      remoteVideoRef.current.srcObject = remotePeers[0].audioStream;
-      console.log('[Video] Remote stream attached');
+    if (remoteVideoRef.current && remotePeers.length > 0) {
+      // Find the first peer with an active audio stream
+      const activePeer = remotePeers.find(p => p.audioStream);
+      if (activePeer) {
+        remoteVideoRef.current.srcObject = activePeer.audioStream;
+        console.log(`[Video] Remote stream attached from ${activePeer.participantName}`);
+      }
     }
   }, [remotePeers]);
 
@@ -147,11 +151,11 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
             <div>
               <h1 className="text-white font-bold">{config.roomName}</h1>
               <p className="text-xs text-gray-400">
-                {participants.length + 1} participant{participants.length !== 0 ? 's' : ''}
+                {participants.length + 1} participant{participants.length !== 0 ? 's' : ''} total
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* Status Indicators */}
             <div className="flex items-center gap-2 bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
@@ -168,7 +172,7 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
                 </span>
               )}
             </div>
-            
+
             {/* Language Badge */}
             <div className="bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-full">
               <span className="text-xs text-gray-300">
@@ -181,58 +185,83 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
 
       {/* Main Video Area */}
       <div className="flex-1 relative">
-        {/* Remote Video (Full Screen) */}
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`w-full h-full object-cover ${remotePeers.length > 0 && remotePeers[0].audioStream ? '' : 'hidden'}`}
-        />
-        
+        {/* Remote Video (Full Screen) - Show first active participant */}
+        {remotePeers.some(p => p.audioStream) && (
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+            onLoadedData={() => {
+              // Find the first peer with audio stream and attach it
+              const activePeer = remotePeers.find(p => p.audioStream);
+              if (activePeer && remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = activePeer.audioStream;
+                console.log('[Video] Attached active peer stream to main video');
+              }
+            }}
+          />
+        )}
+
         {/* Waiting State - Show when no remote video */}
-        {(!remotePeers.length || !remotePeers[0].audioStream) && (
+        {(!remotePeers.length || !remotePeers.some(p => p.audioStream)) && (
           <div className="w-full h-full bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex items-center justify-center">
             <div className="text-center">
               <div className="w-32 h-32 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-slate-600">
-                <span className="text-5xl opacity-50">👤</span>
+                <span className="text-5xl opacity-50">�</span>
               </div>
-              <h3 className="text-xl font-medium text-gray-300 mb-2">Waiting for others...</h3>
+              <h3 className="text-xl font-medium text-gray-300 mb-2">Waiting for participants...</h3>
               <p className="text-gray-500 text-sm mb-4">Share this unique room ID to invite participants:</p>
               <div className="inline-flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-xl">
                 <span className="text-purple-400 font-mono text-sm">{uniqueRoomId || config.roomName}</span>
-                <button 
+                <button
                   onClick={() => navigator.clipboard.writeText(uniqueRoomId || config.roomName)}
                   className="text-gray-400 hover:text-white transition"
                 >
                   📋
                 </button>
               </div>
+              {participants.length > 0 && (
+                <div className="mt-4 text-sm text-gray-400">
+                  {participants.length} participant{participants.length !== 1 ? 's' : ''} joined (connecting audio/video...)
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Remote Participant Name Overlay */}
-        {participants[0] && remotePeers.length > 0 && remotePeers[0].audioStream && (
-          <div className="absolute top-20 left-4 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                {participants[0].name[0].toUpperCase()}
-              </div>
-              <div>
-                <p className="text-white font-medium text-sm">{participants[0].name}</p>
-                <p className="text-gray-400 text-xs">
-                  {participants[0].isSpeaking ? '🎙️ Speaking' : '🔇 Silent'}
-                </p>
+        {/* Remote Participant Names Overlay - Show all participants */}
+        {participants.map((participant, index) => {
+          const remotePeer = remotePeers.find(p => p.peerId === participant.id);
+          const hasStream = remotePeer?.audioStream;
+
+          if (!hasStream) return null;
+
+          return (
+            <div
+              key={participant.id}
+              className="absolute top-50 left-4 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg"
+              style={{ top: `${20 + index * 60}px` }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                  {participant.name[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-white font-medium text-sm">{participant.name}</p>
+                  <p className="text-gray-400 text-xs">
+                    {participant.isSpeaking ? '🎙️ Speaking' : '🔇 Silent'}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })}
 
         {/* Local Video (PiP) */}
-        <div className={`absolute bottom-28 right-4 w-48 aspect-video rounded-xl overflow-hidden shadow-2xl border-2 transition-all duration-300 ${
-          isTalking ? 'border-red-500 ring-4 ring-red-500/30' : 'border-slate-600'
-        }`}>
+        <div className={`absolute bottom-28 right-4 w-48 aspect-video rounded-xl overflow-hidden shadow-2xl border-2 transition-all duration-300 ${isTalking ? 'border-red-500 ring-4 ring-red-500/30' : 'border-slate-600'
+          }`}>
           {/* Video element */}
           <video
             ref={localVideoRef}
@@ -242,7 +271,7 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
             className={`w-full h-full object-cover ${localStream ? '' : 'hidden'}`}
             style={{ transform: 'scaleX(-1)' }}
           />
-          
+
           {/* Placeholder when video is off */}
           {!localStream && (
             <div className="w-full h-full bg-slate-800 flex items-center justify-center">
@@ -256,7 +285,7 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
               </div>
             </div>
           )}
-          
+
           {/* Local Video Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
           <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
@@ -274,11 +303,10 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
           {messageHistory.length > 0 && (
             <div className="space-y-2">
               {messageHistory.slice(0, 3).map((msg, i) => (
-                <div 
+                <div
                   key={i}
-                  className={`bg-black/60 backdrop-blur-sm rounded-xl p-3 border border-white/10 transition-all duration-500 ${
-                    i === 0 ? 'opacity-100' : i === 1 ? 'opacity-70' : 'opacity-40'
-                  }`}
+                  className={`bg-black/60 backdrop-blur-sm rounded-xl p-3 border border-white/10 transition-all duration-500 ${i === 0 ? 'opacity-100' : i === 1 ? 'opacity-70' : 'opacity-40'
+                    }`}
                   style={{ transform: `translateY(${i * 4}px)` }}
                 >
                   <div className="flex items-center gap-2 mb-1">
@@ -316,11 +344,10 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
             {/* Video Toggle Button */}
             <button
               onClick={toggleVideo}
-              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isVideoEnabled 
-                  ? 'bg-slate-700 hover:bg-slate-600' 
+              className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isVideoEnabled
+                  ? 'bg-slate-700 hover:bg-slate-600'
                   : 'bg-red-600 hover:bg-red-700'
-              }`}
+                }`}
               title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
             >
               {isVideoEnabled ? (
@@ -342,23 +369,20 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
               onMouseLeave={stopTalking}
               onTouchStart={(e) => { e.preventDefault(); startTalking(); }}
               onTouchEnd={(e) => { e.preventDefault(); stopTalking(); }}
-              className={`relative group transition-all duration-200 select-none touch-none ${
-                isTalking ? 'scale-110' : 'hover:scale-105'
-              }`}
+              className={`relative group transition-all duration-200 select-none touch-none ${isTalking ? 'scale-110' : 'hover:scale-105'
+                }`}
             >
               {/* Glow Effect */}
-              <div className={`absolute inset-0 rounded-full blur-xl transition-all duration-300 ${
-                isTalking 
-                  ? 'bg-red-500/50 animate-pulse' 
+              <div className={`absolute inset-0 rounded-full blur-xl transition-all duration-300 ${isTalking
+                  ? 'bg-red-500/50 animate-pulse'
                   : 'bg-purple-500/20 group-hover:bg-purple-500/40'
-              }`}></div>
-              
+                }`}></div>
+
               {/* Button */}
-              <div className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isTalking
+              <div className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 ${isTalking
                   ? 'bg-gradient-to-br from-red-500 to-pink-600 shadow-lg shadow-red-500/50'
                   : 'bg-gradient-to-br from-purple-600 to-blue-600 shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50'
-              }`}>
+                }`}>
                 {isTalking ? (
                   <div className="flex items-center justify-center">
                     <div className="flex gap-1">
@@ -376,12 +400,12 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
                   </div>
                 ) : (
                   <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                   </svg>
                 )}
               </div>
-              
+
               {/* Label */}
               <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
                 <span className={`text-xs font-medium ${isTalking ? 'text-red-400' : 'text-gray-400'}`}>

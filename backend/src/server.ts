@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { config } from './config/config';
-import { generateAccessToken, listRooms, deleteAllRooms, getRoomParticipants } from './services/peerJsService';
+import { generateAccessToken, listRooms, deleteAllRooms, getRoomParticipants, removeParticipant } from './services/peerJsService';
 import { initTranslationWebSocket, getActiveSessionCount, cleanupAllSessions } from './services/translationService';
 import { TokenRequest, ErrorResponse } from './types';
 
@@ -123,6 +123,52 @@ app.post('/api/token', async (req: Request, res: Response) => {
     return res.status(500).json({
       error: 'Internal Server Error',
       message: error.message || 'Failed to generate token',
+      statusCode: 500
+    } as ErrorResponse);
+  }
+});
+
+/**
+ * POST /api/room/:roomId/leave
+ * 
+ * Handle participant leaving a room
+ * Cleans up participant data and manages room lifecycle
+ * 
+ * PATH PARAMETERS:
+ * - roomId: The unique room ID
+ * 
+ * REQUEST BODY:
+ * {
+ *   "peerId": "alice_1234567890"
+ * }
+ */
+app.post('/api/room/:roomId/leave', (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { peerId } = req.body;
+
+    if (!roomId || !peerId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Missing required parameters: roomId and peerId',
+        statusCode: 400
+      } as ErrorResponse);
+    }
+
+    // Remove participant from room
+    removeParticipant(roomId, peerId);
+
+    console.log(`[API] ✓ Participant ${peerId} left room ${roomId}`);
+
+    return res.json({
+      success: true,
+      message: 'Participant successfully left room'
+    });
+  } catch (error: any) {
+    console.error('[API] ✗ Error handling participant leave:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to handle participant leave',
       statusCode: 500
     } as ErrorResponse);
   }

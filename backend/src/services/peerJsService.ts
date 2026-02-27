@@ -38,6 +38,12 @@ interface Room {
 const activeRooms = new Map<string, Room>();
 
 /**
+ * Map of normalized room names to unique room IDs
+ * Used to quickly find existing rooms and prevent race condition duplicates
+ */
+const roomNameIndex = new Map<string, string>();
+
+/**
  * Normalize room name for consistent matching
  * - Converts to lowercase
  * - Trims whitespace
@@ -78,70 +84,100 @@ export async function generateAccessToken(
   request: TokenRequest
 ): Promise<TokenResponse> {
   const { roomName, participantName, targetLanguage } = request;
-  
-  // Normalize room name for consistent matching
-  const normalizedRoomName = normalizeRoomName(roomName);
 
-  // Generate unique peer ID
-  const peerId = `${participantName}_${Date.now()}`;
-  
+  console.log(`[PeerJS] ========== ROOM JOIN REQUEST ==========`)
+  console.log(`[PeerJS] Request roomName: "${roomName}"`)
+  console.log(`[PeerJS] Request participantName: "${participantName}"`)
+  console.log(`[PeerJS] Request targetLanguage: "${targetLanguage}"`)
+  console.log(`[PeerJS] RoomName contains underscore: ${roomName.includes('_')}`)
+
+  // Normalize room name for consistent matching (language doesn't matter for room)
+  const normalizedRoomName = normalizeRoomName(roomName);
+  console.log(`[PeerJS] Normalized room name: "${normalizedRoomName}"`)
+
+  // Generate unique peer ID using UUID (not just timestamp to avoid collisions when participants have same name)
+  const peerId = `${participantName.replace(/[^a-z0-9]/gi, '')}_${uuidv4().substring(0, 12)}`;
+
   let uniqueRoomId: string | undefined;
   let room: Room | undefined;
-  
-  // Check if the roomName looks like a unique room ID (contains underscore and was already generated)
-  // If it does, treat it as a join request and search for exact match
-  // If it doesn't, treat it as a create request
-  if (roomName.includes('_')) {
-    // Join mode - user provided full unique room ID
+
+  // CRITICAL FIX: Instead of checking for underscores (fragile), check if the
+  // roomName is an exact key in activeRooms. This correctly handles room names
+  // that naturally contain underscores (e.g., "my_meeting").
+  if (activeRooms.has(roomName)) {
+    // Join mode - user provided an exact unique room ID that exists
     uniqueRoomId = roomName;
-    room = activeRooms.get(uniqueRoomId);
-    
-    if (!room) {
-      throw new Error(`Room with ID "${uniqueRoomId}" not found. Please check the room ID and try again.`);
-    }
-    
-    console.log(`[PeerJS] Joining existing room: ${uniqueRoomId}`);
+    room = activeRooms.get(uniqueRoomId)!;
+
+    console.log(`[PeerJS] JOIN MODE: Found exact room "${uniqueRoomId}"`)
+    console.log(`[PeerJS] Active rooms: ${Array.from(activeRooms.keys()).join(', ')}`)
+    console.log(`[PeerJS] ✓ Found existing room: ${uniqueRoomId} with ${room.participants.size} participants`);
   } else {
-    // Create mode - user provided base room name, generate unique ID
-    
-    // Check if room with this normalized base name already exists
-    for (const [roomId, existingRoom] of activeRooms.entries()) {
-      if (existingRoom.normalizedRoomName === normalizedRoomName) {
-        // Found existing room with same base name
-        uniqueRoomId = roomId;
-        room = existingRoom;
-        console.log(`[PeerJS] Found existing room with base name: "${roomName}" (normalized: "${normalizedRoomName}") -> ${uniqueRoomId}`);
-        break;
+    // Create/Join mode - user provided base room name
+    console.log(`[PeerJS] CREATE/JOIN MODE: Base room name "${roomName}"`)
+
+    // CRITICAL: Check the index FIRST (prevents race condition)
+    if (roomNameIndex.has(normalizedRoomName)) {
+      // Room already exists, use its ID
+      uniqueRoomId = roomNameIndex.get(normalizedRoomName)!;
+      room = activeRooms.get(uniqueRoomId);
+
+      console.log(`[PeerJS] Found existing room in index: "${normalizedRoomName}" -> "${uniqueRoomId}"`)
+
+      if (room) {
+        console.log(`[PeerJS] ✓ Found existing room: ${uniqueRoomId} with ${room.participants.size} participants`);
+      } else {
+        // Room index points to non-existent room, clean up index
+        console.warn(`[PeerJS] Room index corrupted, removing reference: ${normalizedRoomName}`);
+        roomNameIndex.delete(normalizedRoomName);
       }
     }
-    
-    // If no existing room found, create new unique ID
+
+    // If still no room, check one more time in the actual map (in case of concurrent requests)
+    // This double-check prevents race conditions where multiple rooms get created
+    if (!room) {
+      console.log(`[PeerJS] Room not found in index, scanning active rooms...`)
+      for (const [roomId, existingRoom] of activeRooms.entries()) {
+        if (existingRoom.normalizedRoomName === normalizedRoomName) {
+          uniqueRoomId = roomId;
+          room = existingRoom;
+          console.log(`[PeerJS] Found existing room via map scan: "${roomName}" (normalized: "${normalizedRoomName}") -> ${uniqueRoomId}`);
+          // Update index to prevent future lookups
+          roomNameIndex.set(normalizedRoomName, uniqueRoomId);
+          break;
+        }
+      }
+    }
+
+    // If room STILL doesn't exist, create it now
     if (!room) {
       uniqueRoomId = generateUniqueRoomId(roomName);
-      console.log(`[PeerJS] Creating new room: "${roomName}" (normalized: "${normalizedRoomName}") -> ${uniqueRoomId}`);
+      console.log(`[PeerJS] CREATING NEW ROOM: "${roomName}" (normalized: "${normalizedRoomName}") -> ${uniqueRoomId}`);
+
+      // Create room
+      room = {
+        roomId: uniqueRoomId,
+        roomName: roomName,
+        normalizedRoomName: normalizedRoomName,
+        participants: new Map(),
+        createdAt: new Date(),
+        emptyTimeout: null
+      };
+
+      // Add to both maps atomically
+      activeRooms.set(uniqueRoomId, room);
+      roomNameIndex.set(normalizedRoomName, uniqueRoomId);
+
+      console.log(`[PeerJS] ✓ Created new room: ${uniqueRoomId}`);
     }
   }
 
-  // Create room if it doesn't exist (for create mode)
-  if (!room && uniqueRoomId) {
-    room = {
-      roomId: uniqueRoomId,
-      roomName: roomName,
-      normalizedRoomName: normalizedRoomName,
-      participants: new Map(),
-      createdAt: new Date(),
-      emptyTimeout: null
-    };
-    activeRooms.set(uniqueRoomId, room);
-    console.log(`[PeerJS] New room created: ${uniqueRoomId}`);
-  }
-  
-  // Ensure we have a room and uniqueRoomId
+  // Ensure we have a room and uniqueRoomId (final safety check)
   if (!room || !uniqueRoomId) {
     throw new Error('Failed to create or retrieve room');
   }
 
-  // Create participant metadata
+  // Create participant metadata (language is just personal preference, not room membership)
   const metadata: ParticipantMetadata = {
     targetLanguage,
     isTranslatedTrack: false
@@ -164,8 +200,12 @@ export async function generateAccessToken(
     room.emptyTimeout = null;
   }
 
-  console.log(`[PeerJS] Participant joined: ${participantName} (${peerId}) in room ${uniqueRoomId}`);
-  console.log(`[PeerJS] Room participants: ${room.participants.size}`);
+  console.log(`[PeerJS] ✓ PARTICIPANT JOINED: ${participantName} (${peerId}) in room ${uniqueRoomId}`);
+  console.log(`[PeerJS] Room now has ${room.participants.size} participant(s):`);
+  Array.from(room.participants.values()).forEach(p => {
+    console.log(`[PeerJS]   - ${p.name} (${p.id})`);
+  });
+  console.log(`[PeerJS] Active rooms total: ${activeRooms.size}`);
 
   // Return OTHER participants (exclude self) so they can connect
   const otherParticipants = Array.from(room.participants.values())
@@ -176,14 +216,27 @@ export async function generateAccessToken(
       createdAt: p.joinedAt
     }));
 
-  return {
+  console.log(`[PeerJS] Returning ${otherParticipants.length} other participants for ${participantName}:`);
+  otherParticipants.forEach(p => {
+    console.log(`[PeerJS]   - ${p.name} (${p.id})`);
+  });
+
+  const response = {
     token: peerId, // PeerJS uses ID directly, not JWT
     url: 'peerjs', // Indicator that this uses PeerJS instead of LiveKit
     roomName: roomName, // Original room name for UI display
     uniqueRoomId: uniqueRoomId, // Unique room ID for sharing
     peerId: peerId, // Client needs this to establish connections
+    participantName: participantName, // Return the participant's name for tracking in frontend
     roomParticipants: otherParticipants  // OTHER participants (self excluded)
   };
+
+  console.log(`[PeerJS] ========== RESPONSE ==========`)
+  console.log(`[PeerJS] uniqueRoomId: ${response.uniqueRoomId}`)
+  console.log(`[PeerJS] roomParticipants: ${response.roomParticipants.length} participants`)
+  console.log(`[PeerJS] ======================================`)
+
+  return response;
 }
 
 /**
@@ -194,7 +247,7 @@ export async function generateAccessToken(
  */
 export function getRoomParticipants(roomId: string) {
   const room = activeRooms.get(roomId);
-  
+
   if (!room) {
     console.warn(`[PeerJS] Room not found: ${roomId}`);
     return [];
@@ -217,7 +270,7 @@ export function getRoomParticipants(roomId: string) {
  */
 export function removeParticipant(roomId: string, peerId: string): void {
   const room = activeRooms.get(roomId);
-  
+
   if (!room) {
     console.warn(`[PeerJS] Room not found: ${roomId}`);
     return;
@@ -230,9 +283,10 @@ export function removeParticipant(roomId: string, peerId: string): void {
   // If room is empty, schedule deletion
   if (room.participants.size === 0) {
     console.log(`[PeerJS] Room empty: ${roomId} (will delete in 5 minutes)`);
-    
+
     room.emptyTimeout = setTimeout(() => {
       activeRooms.delete(roomId);
+      roomNameIndex.delete(room.normalizedRoomName);
       console.log(`[PeerJS] Room deleted: ${roomId}`);
     }, 5 * 60 * 1000); // 5 minutes
   }
@@ -244,7 +298,7 @@ export function removeParticipant(roomId: string, peerId: string): void {
  * 
  * @returns Array of room information
  */
-export function listRooms(): Array<{roomId: string; roomName: string; participantCount: number; createdAt: Date}> {
+export function listRooms(): Array<{ roomId: string; roomName: string; participantCount: number; createdAt: Date }> {
   return Array.from(activeRooms.values()).map(room => ({
     roomId: room.roomId,
     roomName: room.roomName,
@@ -270,11 +324,15 @@ export function getRoom(roomId: string): Room | null {
  */
 export function deleteRoom(roomId: string): void {
   const room = activeRooms.get(roomId);
-  
-  if (room && room.emptyTimeout) {
-    clearTimeout(room.emptyTimeout);
+
+  if (room) {
+    if (room.emptyTimeout) {
+      clearTimeout(room.emptyTimeout);
+    }
+    // Clean up room name index to prevent stale references
+    roomNameIndex.delete(room.normalizedRoomName);
   }
-  
+
   activeRooms.delete(roomId);
   console.log(`[PeerJS] Room deleted: ${roomId}`);
 }
@@ -301,6 +359,7 @@ export function deleteAllRooms(): void {
     }
     deleteRoom(roomId);
   });
+  roomNameIndex.clear();
   console.log('[PeerJS] All rooms cleaned up');
 }
 
