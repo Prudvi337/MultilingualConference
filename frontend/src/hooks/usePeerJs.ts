@@ -46,7 +46,9 @@ export interface IncomingMessage {
 
 // Translation WebSocket URL - derived dynamically from environment
 function getWsUrl(): string {
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  // Remove trailing slash if present
+  const backendUrl = rawBackendUrl.replace(/\/+$/, '');
   const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
   const wsHost = backendUrl.replace(/^https?:\/\//, '');
   return `${wsProtocol}://${wsHost}/ws/translate`;
@@ -711,6 +713,14 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     console.log('[PTT] Started talking');
     isTalkingRef.current = true;
     setIsTalking(true);
+
+    // Resume audio contexts on user gesture to avoid browser blocking
+    if (playbackContextRef.current?.state === 'suspended') {
+      playbackContextRef.current.resume().catch(e => console.error('[Audio] Failed to resume playback context:', e));
+    }
+    if (captureContextRef.current?.state === 'suspended') {
+      captureContextRef.current.resume().catch(e => console.error('[Audio] Failed to resume capture context:', e));
+    }
   }, []);
 
   /**

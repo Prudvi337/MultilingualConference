@@ -59,11 +59,13 @@ export function useTranslation(options: UseTranslationOptions) {
     }
 
     // Get WebSocket URL from environment or derive from backend URL
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    // Remove trailing slash if present
+    const backendUrl = rawBackendUrl.replace(/\/+$/, '');
     const wsProtocol = backendUrl.startsWith('https') ? 'wss' : 'ws';
     const wsHost = backendUrl.replace(/^https?:\/\//, '');
     const wsUrl = `${wsProtocol}://${wsHost}/ws/translate`;
-    
+
     console.log(`[Translation] Connecting to ${wsUrl}...`);
 
     const ws = new WebSocket(wsUrl);
@@ -171,16 +173,16 @@ export function useTranslation(options: UseTranslationOptions) {
       }
 
       const audioContext = audioContextRef.current;
-      
+
       // Decode the audio data (MP3 from OpenAI TTS)
       const audioBuffer = await audioContext.decodeAudioData(audioData.slice(0));
-      
+
       // Create source and play
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
       source.start(0);
-      
+
       console.log('[Translation] Playing translated audio');
     } catch (error) {
       console.error('[Translation] Failed to play audio:', error);
@@ -197,7 +199,7 @@ export function useTranslation(options: UseTranslationOptions) {
     }
 
     let buffer: ArrayBuffer;
-    
+
     if (audioData instanceof ArrayBuffer) {
       buffer = audioData;
     } else if (audioData instanceof Int16Array) {
@@ -224,12 +226,12 @@ export function useTranslation(options: UseTranslationOptions) {
   const disconnect = useCallback(() => {
     if (wsRef.current) {
       console.log('[Translation] Disconnecting...');
-      
+
       // Send stop message
       if (wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'stop' }));
       }
-      
+
       wsRef.current.close();
       wsRef.current = null;
     }

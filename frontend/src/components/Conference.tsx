@@ -241,8 +241,8 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
           return (
             <div
               key={participant.id}
-              className="absolute top-50 left-4 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg"
-              style={{ top: `${20 + index * 60}px` }}
+              className="absolute left-4 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg z-10"
+              style={{ top: `${90 + index * 60}px` }}
             >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -345,8 +345,8 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
             <button
               onClick={toggleVideo}
               className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isVideoEnabled
-                  ? 'bg-slate-700 hover:bg-slate-600'
-                  : 'bg-red-600 hover:bg-red-700'
+                ? 'bg-slate-700 hover:bg-slate-600'
+                : 'bg-red-600 hover:bg-red-700'
                 }`}
               title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
             >
@@ -374,14 +374,14 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
             >
               {/* Glow Effect */}
               <div className={`absolute inset-0 rounded-full blur-xl transition-all duration-300 ${isTalking
-                  ? 'bg-red-500/50 animate-pulse'
-                  : 'bg-purple-500/20 group-hover:bg-purple-500/40'
+                ? 'bg-red-500/50 animate-pulse'
+                : 'bg-purple-500/20 group-hover:bg-purple-500/40'
                 }`}></div>
 
               {/* Button */}
               <div className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 ${isTalking
-                  ? 'bg-gradient-to-br from-red-500 to-pink-600 shadow-lg shadow-red-500/50'
-                  : 'bg-gradient-to-br from-purple-600 to-blue-600 shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50'
+                ? 'bg-gradient-to-br from-red-500 to-pink-600 shadow-lg shadow-red-500/50'
+                : 'bg-gradient-to-br from-purple-600 to-blue-600 shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50'
                 }`}>
                 {isTalking ? (
                   <div className="flex items-center justify-center">
