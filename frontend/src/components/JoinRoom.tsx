@@ -20,7 +20,7 @@ interface JoinRoomProps {
 export default function JoinRoom({ onJoin }: JoinRoomProps) {
   const [roomName, setRoomName] = useState('');
   const [participantName, setParticipantName] = useState('');
-  const [targetLanguage, setTargetLanguage] = useState<string>('en');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const [isBackendHealthy, setIsBackendHealthy] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [mode, setMode] = useState<'create' | 'join'>('create');
@@ -54,12 +54,13 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
     console.log('[JoinRoom] Submitting with mode:', mode);
     console.log('[JoinRoom] Room name:', roomName);
     console.log('[JoinRoom] Participant name:', participantName);
-    console.log('[JoinRoom] Target language:', targetLanguage);
+    console.log('[JoinRoom] Language:', selectedLanguage);
 
     onJoin({
       roomName: roomName.trim(),
       participantName: participantName.trim(),
-      targetLanguage: targetLanguage as any
+      targetLanguage: selectedLanguage as any,
+      speakerLanguage: selectedLanguage as any
     });
   };
 
@@ -200,16 +201,16 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
               </div>
             </div>
 
-            {/* Target Language */}
+            {/* Language Selection */}
             <div>
-              <label htmlFor="targetLanguage" className="block text-sm font-medium text-gray-300 mb-2">
-                I want to hear translations in
+              <label htmlFor="selectedLanguage" className="block text-sm font-medium text-gray-300 mb-2">
+                Select Your Language
               </label>
               <div className="relative">
                 <select
-                  id="targetLanguage"
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  id="selectedLanguage"
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition appearance-none cursor-pointer"
                   disabled={!isBackendHealthy}
                 >
@@ -223,7 +224,7 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
               </div>
               <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                 <span>💡</span>
-                Others' speech will be translated to this language
+                You'll speak and hear translations in this language
               </p>
             </div>
 

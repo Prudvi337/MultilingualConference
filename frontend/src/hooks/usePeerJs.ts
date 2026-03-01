@@ -27,11 +27,13 @@ export interface UsePeerJsResult {
   uniqueRoomId: string | null;  // Unique room ID for sharing
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';  // Detailed connection status
   targetLanguage: LanguageCode; // Current listening language
+  speakerLanguage: LanguageCode; // Current speaking language
   disconnect: () => Promise<void>;
   startTalking: () => void;  // Push-to-Talk: start
   stopTalking: () => void;   // Push-to-Talk: stop
   toggleVideo: () => void;   // Toggle video on/off
   setTargetLanguage: (lang: LanguageCode) => void; // Update listening language mid-meeting
+  setSpeakerLanguage: (lang: LanguageCode) => void; // Update speaking language mid-meeting
 }
 
 // Message received from another participant
@@ -110,6 +112,7 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [uniqueRoomId, setUniqueRoomId] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguageState] = useState<LanguageCode>(config.targetLanguage);
+  const [speakerLanguage, setSpeakerLanguageState] = useState<LanguageCode>(config.speakerLanguage);
 
   // Function to update target language mid-meeting
   const setTargetLanguage = useCallback((newLang: LanguageCode) => {
@@ -125,8 +128,22 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     }
   }, []);
 
+  // Function to update speaker language mid-meeting
+  const setSpeakerLanguage = useCallback((newLang: LanguageCode) => {
+    console.log(`[Translation] Switching speaker language to: ${newLang}`);
+    setSpeakerLanguageState(newLang);
+
+    // Update backend via WebSocket if connected
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'configure',
+        speakerLanguage: newLang
+      }));
+    }
+  }, []);
+
   // CRITICAL FIX: Stable config key
-  const configKey = useMemo(() => JSON.stringify(config), [config.roomName, config.participantName, config.targetLanguage]);
+  const configKey = useMemo(() => JSON.stringify(config), [config.roomName, config.participantName, config.targetLanguage, config.speakerLanguage]);
 
   // Refs
   const isMountedRef = useRef(true);
@@ -475,6 +492,7 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
                     roomName: roomForTranslation,
                     participantId: currentConfig.participantName,
                     targetLanguage: currentConfig.targetLanguage,
+                    speakerLanguage: currentConfig.speakerLanguage,
                     sampleRate: 16000,
                     channels: 1,
                   }));
@@ -809,11 +827,13 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     uniqueRoomId,
     connectionStatus,
     targetLanguage,
+    speakerLanguage,
     disconnect,
     startTalking,
     stopTalking,
     toggleVideo,
-    setTargetLanguage
+    setTargetLanguage,
+    setSpeakerLanguage
   };
 }
 

@@ -28,6 +28,7 @@ export interface RoomConfig {
   roomName: string;
   participantName: string;
   targetLanguage: LanguageCode;
+  speakerLanguage: LanguageCode;
 }
 
 export interface ParticipantInfo {

@@ -10,6 +10,7 @@ interface TranslationSession {
   participantId: string;
   roomName: string;
   targetLanguage: LanguageCode;  // Language THIS participant wants to HEAR
+  speakerLanguage: LanguageCode; // Language THIS participant SPEAKS
   audioBuffer: Buffer[];
   isProcessing: boolean;
   lastProcessTime: number;
@@ -90,6 +91,7 @@ function handleControlMessage(ws: WebSocket, message: any): void {
         participantId: message.participantId || `user-${Date.now()}`,
         roomName: message.roomName || 'default',
         targetLanguage: message.targetLanguage || 'en',
+        speakerLanguage: message.speakerLanguage || message.targetLanguage || 'en',
         audioBuffer: [],
         isProcessing: false,
         lastProcessTime: Date.now(),
@@ -133,13 +135,17 @@ function handleControlMessage(ws: WebSocket, message: any): void {
         if (message.targetLanguage) {
           sessionToUpdate.targetLanguage = message.targetLanguage;
         }
+        if (message.speakerLanguage) {
+          sessionToUpdate.speakerLanguage = message.speakerLanguage;
+        }
         if (message.sampleRate) {
           sessionToUpdate.sampleRate = message.sampleRate;
         }
-        console.log(`[TranslationService] Updated config for ${sessionToUpdate.participantId} to ${sessionToUpdate.targetLanguage}`);
+        console.log(`[TranslationService] Updated config for ${sessionToUpdate.participantId}: Hear=${sessionToUpdate.targetLanguage}, Speak=${sessionToUpdate.speakerLanguage}`);
         sendMessage(ws, {
           type: 'started',
           targetLanguage: sessionToUpdate.targetLanguage,
+          speakerLanguage: sessionToUpdate.speakerLanguage,
           message: 'Voice configuration updated'
         });
       }
@@ -321,9 +327,8 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
       sampleRate: session.sampleRate,
       channels: session.channels,
       timestamp: Date.now(),
-      // We assume the user speaks the language they have selected to listen to.
-      // E.g., if targetLanguage is 'te', we hint Whisper that the audio is Telugu.
-      language: session.targetLanguage,
+      // Use the language the user actually SPEAKS to hint Whisper
+      language: session.speakerLanguage,
     };
 
     // Step 1: Speech-to-Text (same for everyone)
@@ -388,7 +393,12 @@ async function sendTranslationToRecipient(
   try {
     // Check if translation is needed (same language)
     if (sourceLanguage === targetLanguage) {
-      console.log(`[TranslationService] Same language, sending original text to ${recipient.participantId}`);
+      console.log(`[TranslationService] Same language, sending original text + TTS to ${recipient.participantId}`);
+
+      // Still generate TTS so recipient HEARS the message
+      const tts = await textToSpeech(originalText, targetLanguage);
+      console.log(`[TranslationService] TTS (same lang) for ${recipient.participantId}: ${tts.audioBuffer.length} bytes`);
+
       sendMessage(recipient.ws, {
         type: 'incoming_message',
         from: speakerId,
@@ -398,6 +408,12 @@ async function sendTranslationToRecipient(
         targetLanguage,
         wasTranslated: false,
       });
+
+      // Send audio (binary MP3)
+      if (recipient.ws.readyState === WebSocket.OPEN) {
+        recipient.ws.send(tts.audioBuffer);
+        console.log(`[TranslationService] ✓ Sent audio (same lang) to ${recipient.participantId}`);
+      }
       return;
     }
 

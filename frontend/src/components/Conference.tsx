@@ -39,7 +39,8 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
     startTalking,
     stopTalking,
     toggleVideo,
-    setTargetLanguage
+    setTargetLanguage,
+    setSpeakerLanguage
   } = usePeerJs(config);
 
   // Message history for better UX
@@ -173,10 +174,14 @@ export default function Conference({ config, onDisconnect }: ConferenceProps) {
 
             {/* Language Selection mid-meeting */}
             <div className="flex items-center gap-1.5 bg-slate-800/60 backdrop-blur-sm px-2 md:px-3 py-1 md:py-1.5 rounded-full flex-shrink-0 border border-purple-500/20">
-              <span className="text-[10px] md:text-xs text-gray-400 hidden xs:inline">Listening in:</span>
+              <span className="text-[10px] md:text-xs text-gray-400 hidden xs:inline">My Language:</span>
               <select
                 value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value as LanguageCode)}
+                onChange={(e) => {
+                  const lang = e.target.value as LanguageCode;
+                  setTargetLanguage(lang);
+                  setSpeakerLanguage(lang);
+                }}
                 className="bg-transparent text-[10px] md:text-xs text-purple-400 font-medium outline-none cursor-pointer appearance-none text-center"
               >
                 {LANGUAGES.map(lang => (

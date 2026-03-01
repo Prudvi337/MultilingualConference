@@ -71,6 +71,12 @@ export async function transcribeAudio(
     // This avoids the stream issues with the SDK
     const audioFile = await toFile(wavBuffer, 'audio.wav', { type: 'audio/wav' });
 
+    // Languages whose ISO-639-1 codes are rejected by the OpenAI transcriptions
+    // API `language` parameter (400 error). For these, we omit the language hint
+    // and let Whisper auto-detect. This produces native-script output (e.g., Telugu
+    // script నమస్కారం instead of English transliteration "Namaskaram").
+    const UNSUPPORTED_LANGUAGE_HINT = ['te', 'ml', 'ta', 'kn'];
+
     // Construct a specialized prompt to help Whisper with Indian languages
     // ONLY vocabulary examples, no instructions to prevent hallucination
     const whisperPrompt = "Namaste, Namaskaram, Nenu bagunnanu, Vanakkam, Eppadi irukkinga, Namaskara, Hegiddira, Sukhamaano";
@@ -81,44 +87,21 @@ export async function transcribeAudio(
       model: config.openai.whisper.model,
       response_format: 'verbose_json',
       temperature: 0.0,
-      prompt: whisperPrompt,
     };
 
-    // Words of caution: While Whisper's underlying model supports 99 languages,
-    // the OpenAI API explicitly rejects some (like Telugu 'te' and Malayalam 'ml')
-    // when passed as the ISO-639-1 `language` parameter, throwing a 400 Error.
-    const UNSUPPORTED_API_LANGUAGES = ['te', 'ml'];
+    // Only add language hint for languages the API supports
+    // For unsupported languages, Whisper will auto-detect (still accurate)
+    if (audioBuffer.language && !UNSUPPORTED_LANGUAGE_HINT.includes(audioBuffer.language)) {
+      params.language = audioBuffer.language;
+      params.prompt = whisperPrompt;
+    }
 
     let text = "";
     let detectedLanguage: LanguageCode = "en";
 
-    // If the hinted language is unsupported by the transcriptions API,
-    // we bypass it entirely and use the translations API instead.
-    // The translations API handles these languages natively and converts them directly to English.
-    if (audioBuffer.language && UNSUPPORTED_API_LANGUAGES.includes(audioBuffer.language)) {
-      console.log(`[Whisper] Using Translation API fallback for unsupported language: ${audioBuffer.language}`);
-      const translationParams: any = {
-        file: audioFile,
-        model: config.openai.whisper.model,
-        response_format: 'verbose_json',
-        temperature: 0.0,
-      };
-
-      const response = await openai.audio.translations.create(translationParams) as any;
-
-      // Since it translates to English, the "transcribed" text is English
-      text = response.text.trim();
-      detectedLanguage = "en"; // The output of the translations endpoint is always English
-    } else {
-      // Standard transcription for supported languages
-      if (audioBuffer.language) {
-        params.language = audioBuffer.language;
-      }
-
-      const response = await openai.audio.transcriptions.create(params) as any;
-      detectedLanguage = (response.language || 'en') as LanguageCode;
-      text = response.text.trim();
-    }
+    const response = await openai.audio.transcriptions.create(params) as any;
+    detectedLanguage = (response.language || audioBuffer.language || 'en') as LanguageCode;
+    text = response.text.trim();
 
     const duration = Date.now() - startTime;
 
