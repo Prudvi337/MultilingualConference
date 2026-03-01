@@ -8,20 +8,10 @@
  */
 
 import { useState, useEffect } from 'react';
-import { RoomConfig, Language } from '../types';
+import { RoomConfig } from '../types';
 import { checkHealth } from '../services/api';
 
-// Supported languages with flags
-const LANGUAGES: Language[] = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'hi', name: 'हिन्दी (Hindi)', flag: '🇮🇳' },
-  { code: 'es', name: 'Español (Spanish)', flag: '🇪🇸' },
-  { code: 'fr', name: 'Français (French)', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch (German)', flag: '🇩🇪' },
-  { code: 'ja', name: '日本語 (Japanese)', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어 (Korean)', flag: '🇰🇷' },
-  { code: 'zh', name: '中文 (Chinese)', flag: '🇨🇳' }
-];
+import { LANGUAGES } from '../constants';
 
 interface JoinRoomProps {
   onJoin: (config: RoomConfig) => void;
@@ -90,17 +80,17 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl mb-4 shadow-lg shadow-purple-500/30">
                 <span className="text-3xl">🌐</span>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-2">
+              <h1 className="text-xl md:text-2xl font-bold text-white mb-2">
                 Multilingual Conference
               </h1>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-400 text-xs md:text-sm">
                 Real-time AI translation for everyone
               </p>
             </div>
           </div>
 
           {/* Status Bar */}
-          <div className="px-8 py-4">
+          <div className="px-6 md:px-8 py-3 md:py-4">
             {isChecking ? (
               <div className="flex items-center justify-center py-2 px-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                 <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -124,7 +114,7 @@ export default function JoinRoom({ onJoin }: JoinRoomProps) {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-5">
+          <form onSubmit={handleSubmit} className="p-6 md:p-8 pt-4 space-y-4 md:space-y-5">
             {/* Mode Toggle */}
             <div>
               <div className="flex bg-slate-700/50 rounded-xl p-1 border border-slate-600/50">

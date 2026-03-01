@@ -7,7 +7,7 @@
 /**
  * Supported language codes (ISO 639-1)
  */
-export type LanguageCode = 'en' | 'hi' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'zh';
+export type LanguageCode = 'en' | 'hi' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'zh' | 'te' | 'ta' | 'kn' | 'ml';
 
 /**
  * Language information
@@ -54,6 +54,7 @@ export interface AudioBuffer {
   sampleRate: number;
   channels: number;
   timestamp: number;
+  language?: LanguageCode; // Optional hint for transcription
 }
 
 /**

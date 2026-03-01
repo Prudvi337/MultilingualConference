@@ -27,7 +27,11 @@ const LANGUAGE_NAMES: Record<LanguageCode, string> = {
   de: 'German',
   ja: 'Japanese',
   ko: 'Korean',
-  zh: 'Chinese'
+  zh: 'Chinese',
+  te: 'Telugu',
+  ta: 'Tamil',
+  kn: 'Kannada',
+  ml: 'Malayalam'
 };
 
 /**
@@ -67,23 +71,60 @@ export async function transcribeAudio(
     // This avoids the stream issues with the SDK
     const audioFile = await toFile(wavBuffer, 'audio.wav', { type: 'audio/wav' });
 
-    // Call Whisper API
-    // Note: We don't specify language to enable auto-detection
-    const response = await openai.audio.transcriptions.create({
+    // Construct a specialized prompt to help Whisper with Indian languages
+    // ONLY vocabulary examples, no instructions to prevent hallucination
+    const whisperPrompt = "Namaste, Namaskaram, Nenu bagunnanu, Vanakkam, Eppadi irukkinga, Namaskara, Hegiddira, Sukhamaano";
+
+    // Prepare API parameters
+    const params: any = {
       file: audioFile,
       model: config.openai.whisper.model,
-      response_format: 'verbose_json', // Get language detection info
-      temperature: 0.0 // Deterministic output
-    });
+      response_format: 'verbose_json',
+      temperature: 0.0,
+      prompt: whisperPrompt,
+    };
 
-    const detectedLanguage = (response.language || 'en') as LanguageCode;
-    const text = response.text.trim();
+    // Words of caution: While Whisper's underlying model supports 99 languages,
+    // the OpenAI API explicitly rejects some (like Telugu 'te' and Malayalam 'ml')
+    // when passed as the ISO-639-1 `language` parameter, throwing a 400 Error.
+    const UNSUPPORTED_API_LANGUAGES = ['te', 'ml'];
+
+    let text = "";
+    let detectedLanguage: LanguageCode = "en";
+
+    // If the hinted language is unsupported by the transcriptions API,
+    // we bypass it entirely and use the translations API instead.
+    // The translations API handles these languages natively and converts them directly to English.
+    if (audioBuffer.language && UNSUPPORTED_API_LANGUAGES.includes(audioBuffer.language)) {
+      console.log(`[Whisper] Using Translation API fallback for unsupported language: ${audioBuffer.language}`);
+      const translationParams: any = {
+        file: audioFile,
+        model: config.openai.whisper.model,
+        response_format: 'verbose_json',
+        temperature: 0.0,
+      };
+
+      const response = await openai.audio.translations.create(translationParams) as any;
+
+      // Since it translates to English, the "transcribed" text is English
+      text = response.text.trim();
+      detectedLanguage = "en"; // The output of the translations endpoint is always English
+    } else {
+      // Standard transcription for supported languages
+      if (audioBuffer.language) {
+        params.language = audioBuffer.language;
+      }
+
+      const response = await openai.audio.transcriptions.create(params) as any;
+      detectedLanguage = (response.language || 'en') as LanguageCode;
+      text = response.text.trim();
+    }
 
     const duration = Date.now() - startTime;
 
     console.log(
-      `[Whisper] ✓ Transcribed in ${duration}ms | ` +
-      `Language: ${LANGUAGE_NAMES[detectedLanguage]} | ` +
+      `[Whisper] ✓ Transcribed/Translated in ${duration}ms | ` +
+      `Output Language: ${LANGUAGE_NAMES[detectedLanguage]} | ` +
       `Text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`
     );
 
@@ -156,7 +197,12 @@ ${text}`;
       messages: [
         {
           role: 'system',
-          content: 'You are a professional translator. Provide accurate, natural translations without any additional commentary.'
+          content: 'You are a strict, raw translation engine. Your ONLY purpose is to translate the input text from the source language to the target language. ' +
+            'RULES: ' +
+            '1. NEVER apologize, ask for context, or converse with the user. ' +
+            '2. NEVER start a response with "As an AI..." or similar phrases. ' +
+            '3. If the input seems ambiguous, incomplete, or nonsensical, provide your best guess at a direct translation, or return the original text exactly as provided. ' +
+            '4. Output NOTHING but the translated text itself.'
         },
         {
           role: 'user',

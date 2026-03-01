@@ -145,6 +145,15 @@ function handleControlMessage(ws: WebSocket, message: any): void {
       }
       break;
 
+    case 'finish':
+      // Force immediate processing of remaining audio
+      const finisher = sessions.get(ws);
+      if (finisher && finisher.audioBuffer.length > 0) {
+        console.log(`[TranslationService] Forced processing of ${finisher.audioBuffer.length} chunks via 'finish' command`);
+        processAudioBuffer(finisher);
+      }
+      break;
+
     default:
       console.warn(`[TranslationService] Unknown message type: ${message.type}`);
   }
@@ -312,6 +321,9 @@ async function processAudioBuffer(session: TranslationSession): Promise<void> {
       sampleRate: session.sampleRate,
       channels: session.channels,
       timestamp: Date.now(),
+      // We assume the user speaks the language they have selected to listen to.
+      // E.g., if targetLanguage is 'te', we hint Whisper that the audio is Telugu.
+      language: session.targetLanguage,
     };
 
     // Step 1: Speech-to-Text (same for everyone)

@@ -2,7 +2,7 @@
  * TypeScript Type Definitions for Frontend
  */
 
-export type LanguageCode = 'en' | 'hi' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'zh';
+export type LanguageCode = 'en' | 'hi' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'zh' | 'te' | 'ta' | 'kn' | 'ml';
 
 export interface Language {
   code: LanguageCode;

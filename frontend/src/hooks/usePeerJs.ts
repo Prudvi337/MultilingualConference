@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Peer, { DataConnection, MediaConnection } from 'peerjs';
 import { getAccessToken, getRoomParticipants, leaveRoom } from '../services/api';
-import { RoomConfig, ParticipantInfo } from '../types';
+import { LANGUAGES } from '../constants';
+import { RoomConfig, ParticipantInfo, LanguageCode } from '../types';
 
 // Remote peer info
 export interface RemotePeerInfo {
@@ -26,10 +27,12 @@ export interface UsePeerJsResult {
   remotePeers: RemotePeerInfo[];  // Remote peers
   uniqueRoomId: string | null;  // Unique room ID for sharing
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';  // Detailed connection status
+  targetLanguage: LanguageCode; // Current listening language
   disconnect: () => Promise<void>;
   startTalking: () => void;  // Push-to-Talk: start
   stopTalking: () => void;   // Push-to-Talk: stop
   toggleVideo: () => void;   // Toggle video on/off
+  setTargetLanguage: (lang: LanguageCode) => void; // Update listening language mid-meeting
 }
 
 // Message received from another participant
@@ -107,8 +110,23 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
   const [remotePeers, setRemotePeers] = useState<RemotePeerInfo[]>([]);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [uniqueRoomId, setUniqueRoomId] = useState<string | null>(null);
+  const [targetLanguage, setTargetLanguageState] = useState<LanguageCode>(config.targetLanguage);
 
-  // CRITICAL FIX: Stable config key to prevent useEffect re-runs on object identity changes
+  // Function to update target language mid-meeting
+  const setTargetLanguage = useCallback((newLang: LanguageCode) => {
+    console.log(`[Translation] Switching target language to: ${newLang}`);
+    setTargetLanguageState(newLang);
+
+    // Update backend via WebSocket if connected
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'configure',
+        targetLanguage: newLang
+      }));
+    }
+  }, []);
+
+  // CRITICAL FIX: Stable config key
   const configKey = useMemo(() => JSON.stringify(config), [config.roomName, config.participantName, config.targetLanguage]);
 
   // Refs
@@ -756,6 +774,11 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     console.log('[PTT] Stopped talking');
     isTalkingRef.current = false;
     setIsTalking(false);
+
+    // Send a finish message to immediately flush the remaining audio for transcription
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'finish' }));
+    }
   }, []);
 
   /**
@@ -786,10 +809,12 @@ export function usePeerJs(config: RoomConfig): UsePeerJsResult {
     remotePeers,
     uniqueRoomId,
     connectionStatus,
+    targetLanguage,
     disconnect,
     startTalking,
     stopTalking,
-    toggleVideo
+    toggleVideo,
+    setTargetLanguage
   };
 }
 
