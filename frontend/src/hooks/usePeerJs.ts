@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Peer, { DataConnection, MediaConnection } from 'peerjs';
 import { getAccessToken, getRoomParticipants, leaveRoom } from '../services/api';
-import { LANGUAGES } from '../constants';
 import { RoomConfig, ParticipantInfo, LanguageCode } from '../types';
 
 // Remote peer info
